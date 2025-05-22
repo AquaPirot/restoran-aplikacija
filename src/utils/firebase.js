@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, where, deleteDoc, doc } from 'firebase/firestore';
 
 // Vaša Firebase konfiguracija
 const firebaseConfig = {
@@ -82,5 +82,18 @@ export const getReportsBySmenaFromFirebase = async (smena) => {
   } catch (error) {
     console.error('Greška pri učitavanju po smeni:', error);
     return [];
+  }
+};
+
+// NOVA FUNKCIJA za brisanje
+export const deleteReportFromFirebase = async (reportId) => {
+  try {
+    console.log('Pokušavam da obrišem izveštaj:', reportId);
+    await deleteDoc(doc(db, 'reports', reportId));
+    console.log('✅ Izveštaj uspešno obrisan iz Firebase:', reportId);
+    return true;
+  } catch (error) {
+    console.error('❌ Greška pri brisanju iz Firebase:', error);
+    throw error;
   }
 };

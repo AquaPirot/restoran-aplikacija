@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getReportsFromFirebase } from '../utils/firebase';
+import { getReportsFromFirebase, deleteReportFromFirebase } from '../utils/firebase';
 import { formatCurrency } from '../utils/calculations';
 import { onSnapshot, collection, query, orderBy } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
@@ -75,6 +75,23 @@ export default function Istorija() {
       alert('Greška pri osvežavanju podataka');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (reportId, datum, smena) => {
+    const confirmMessage = `Da li ste sigurni da želite da obrišete izveštaj?\n\nDatum: ${formatDate(datum)}\nSmena: ${smena}`;
+    
+    if (confirm(confirmMessage)) {
+      try {
+        await deleteReportFromFirebase(reportId);
+        alert('Izveštaj je uspešno obrisan!');
+        
+        // Ukloni iz lokalnog state-a odmah
+        setReports(prev => prev.filter(report => report.id !== reportId));
+      } catch (error) {
+        console.error('Greška pri brisanju:', error);
+        alert('Greška pri brisanju izveštaja: ' + error.message);
+      }
     }
   };
 
@@ -284,12 +301,12 @@ export default function Istorija() {
               filteredReports.map((report) => (
                 <div key={report.id} className="bg-white border rounded-lg shadow-sm">
                   {/* Header */}
-                  <div 
-                    className="p-4 cursor-pointer hover:bg-gray-50"
-                    onClick={() => toggleDetails(report.id)}
-                  >
+                  <div className="p-4 hover:bg-gray-50">
                     <div className="flex justify-between items-start">
-                      <div>
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => toggleDetails(report.id)}
+                      >
                         <h3 className="font-bold text-lg">
                           {formatDate(report.datum)} - {report.smena}
                         </h3>
@@ -300,13 +317,25 @@ export default function Istorija() {
                           {new Date(report.timestamp).toLocaleString('sr-RS')}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-green-600">
-                          {formatCurrency(report.ukupnaGotovina || 0)}
+                      <div className="text-right flex items-center gap-3">
+                        <div>
+                          <div className="text-2xl font-bold text-green-600">
+                            {formatCurrency(report.ukupnaGotovina || 0)}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {showDetails[report.id] ? '▼' : '▶'} Detaljno
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {showDetails[report.id] ? '▼' : '▶'} Detaljno
-                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(report.id, report.datum, report.smena);
+                          }}
+                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-sm transition-colors"
+                          title="Obriši izveštaj"
+                        >
+                          🗑️
+                        </button>
                       </div>
                     </div>
                   </div>
