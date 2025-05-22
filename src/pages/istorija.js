@@ -1,7 +1,24 @@
 import { useState, useEffect } from 'react';
-import { getReports, getReportsByDate, getReportsBySmena } from '../utils/storage';
+import { getReportsFromFirebase } from '../utils/firebase';
 import { formatCurrency } from '../utils/calculations';
+import { onSnapshot, collection, query, orderBy } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
 import Link from 'next/link';
+
+// Firebase config (kopirajte iz vašeg firebase.js)
+const firebaseConfig = {
+  apiKey: "AIzaSyAfZEjfCX1Lu3LIR0yEZXd6YyzzdVBoRNs",
+  authDomain: "restoran-aplikacija-ef31f.firebaseapp.com",
+  projectId: "restoran-aplikacija-ef31f",
+  storageBucket: "restoran-aplikacija-ef31f.firebasestorage.app",
+  messagingSenderId: "663723248829",
+  appId: "1:663723248829:web:45f32ebffd11c9960efbd4",
+  measurementId: "G-X86WXDZCKH"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 export default function Istorija() {
   const [reports, setReports] = useState([]);
@@ -10,52 +27,69 @@ export default function Istorija() {
   const [selectedSmena, setSelectedSmena] = useState('');
   const [showDetails, setShowDetails] = useState({});
   const [loading, setLoading] = useState(true);
+  const [realTimeUpdate, setRealTimeUpdate] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
 
   useEffect(() => {
-    loadReports();
+    // Real-time listener za sve promene u Firebase
+    const q = query(collection(db, 'reports'), orderBy('timestamp', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const newReports = [];
+      querySnapshot.forEach((doc) => {
+        newReports.push({ id: doc.id, ...doc.data() });
+      });
+      
+      console.log('Real-time update: učitano', newReports.length, 'izveštaja');
+      
+      if (reports.length > 0 && newReports.length !== reports.length) {
+        setRealTimeUpdate(true);
+        setTimeout(() => setRealTimeUpdate(false), 3000);
+      }
+      
+      setReports(newReports);
+      setLastUpdate(new Date());
+      setLoading(false);
+    }, (error) => {
+      console.error('Greška u real-time listener:', error);
+      setLoading(false);
+    });
+
+    // Cleanup kada se komponenta unmount-uje
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     filterReports();
   }, [reports, selectedDate, selectedSmena]);
 
-  const loadReports = async () => {
+  const loadReportsManually = async () => {
     try {
       setLoading(true);
-      const allReports = await getReports(); // Sada je async
-      setReports(allReports);
-      console.log('Učitano', allReports.length, 'izveštaja iz Firebase');
+      const freshReports = await getReportsFromFirebase();
+      setReports(freshReports);
+      setLastUpdate(new Date());
+      console.log('Ručno osveženo:', freshReports.length, 'izveštaja');
     } catch (error) {
-      console.error('Greška pri učitavanju izveštaja:', error);
-      alert('Greška pri učitavanju izveštaja iz baze');
+      console.error('Greška pri ručnom osvežavanju:', error);
+      alert('Greška pri osvežavanju podataka');
     } finally {
       setLoading(false);
     }
   };
 
-  const filterReports = async () => {
-    try {
-      let filtered = [...reports];
-      
-      // Ako su odabrani specifični filteri, koristi Firebase query-je
-      if (selectedDate && selectedSmena) {
-        // Kombinacija oba filtera - filtriraj localno
-        filtered = reports.filter(report => 
-          report.datum === selectedDate && report.smena === selectedSmena
-        );
-      } else if (selectedDate) {
-        // Samo datum - koristi Firebase query
-        filtered = await getReportsByDate(selectedDate);
-      } else if (selectedSmena) {
-        // Samo smena - koristi Firebase query  
-        filtered = await getReportsBySmena(selectedSmena);
-      }
-      
-      setFilteredReports(filtered);
-    } catch (error) {
-      console.error('Greška pri filtriranju:', error);
-      setFilteredReports([]);
+  const filterReports = () => {
+    let filtered = [...reports];
+    
+    if (selectedDate) {
+      filtered = filtered.filter(report => report.datum === selectedDate);
     }
+    
+    if (selectedSmena) {
+      filtered = filtered.filter(report => report.smena === selectedSmena);
+    }
+    
+    setFilteredReports(filtered);
   };
 
   const toggleDetails = (reportId) => {
@@ -95,7 +129,7 @@ export default function Istorija() {
 
   const totals = calculateTotals(filteredReports);
 
-  if (loading) {
+  if (loading && reports.length === 0) {
     return (
       <div className="container mx-auto p-4 max-w-4xl">
         <div className="text-center py-8">
@@ -111,18 +145,43 @@ export default function Istorija() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">📊 Istorija izveštaja</h1>
-          <p className="text-sm text-gray-500">Real-time sinhronizacija sa Firebase</p>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Real-time Firebase sinhronizacija</span>
+            {realTimeUpdate && (
+              <span className="bg-green-100 text-green-600 px-2 py-1 rounded-full text-xs">
+                🔄 Novo ažuriranje!
+              </span>
+            )}
+          </div>
+          {lastUpdate && (
+            <p className="text-xs text-gray-400">
+              Poslednje ažuriranje: {lastUpdate.toLocaleTimeString('sr-RS')}
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={loadReports}
-            className="bg-gray-500 text-white px-3 py-2 rounded-lg text-sm"
+            onClick={loadReportsManually}
+            className={`px-3 py-2 rounded-lg text-sm ${
+              loading 
+                ? 'bg-gray-400 text-white cursor-wait' 
+                : 'bg-gray-500 text-white hover:bg-gray-600'
+            }`}
+            disabled={loading}
           >
-            🔄 Osvezi
+            {loading ? '⏳ Osvežavam...' : '🔄 Osvezi'}
           </button>
           <Link href="/" className="bg-blue-500 text-white px-4 py-2 rounded-lg">
             Novi izveštaj
           </Link>
+        </div>
+      </div>
+
+      {/* Statistike */}
+      <div className="bg-blue-50 p-4 rounded-lg mb-4">
+        <div className="flex justify-between text-sm">
+          <span>Ukupno izveštaja u bazi: <strong>{reports.length}</strong></span>
+          <span>Prikazano: <strong>{filteredReports.length}</strong></span>
         </div>
       </div>
 
@@ -184,7 +243,7 @@ export default function Istorija() {
 
           {/* Ukupni izveštaj */}
           {filteredReports.length > 0 && (
-            <div className="bg-blue-50 p-4 rounded-lg mb-6">
+            <div className="bg-green-50 p-4 rounded-lg mb-6">
               <h3 className="font-bold mb-3">
                 📈 Ukupno za {filteredReports.length} izveštaj(a):
               </h3>
