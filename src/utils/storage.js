@@ -1,27 +1,24 @@
-// Privremeno localStorage - zamenićemo sa Firebase
-export const saveReport = (reportData) => {
-  const reports = getReports();
-  const newReport = {
-    id: Date.now(),
-    ...reportData,
-    timestamp: new Date().toISOString()
-  };
-  
-  const updatedReports = [newReport, ...reports];
-  localStorage.setItem('restoran-izvestaji', JSON.stringify(updatedReports));
-  return newReport;
+// Koristimo samo Firebase - uklanjamo localStorage fallback
+import { saveReportToFirebase, getReportsFromFirebase } from './firebase';
+
+export const saveReport = async (reportData) => {
+  console.log('storage.js: pozivam saveReportToFirebase');
+  return await saveReportToFirebase(reportData);
 };
 
-export const getReports = () => {
-  if (typeof window === 'undefined') return [];
-  const data = localStorage.getItem('restoran-izvestaji');
-  return data ? JSON.parse(data) : [];
+export const getReports = async () => {
+  console.log('storage.js: pozivam getReportsFromFirebase');
+  return await getReportsFromFirebase();
 };
 
-export const getReportsByDate = (datum) => {
-  return getReports().filter(report => report.datum === datum);
+export const getReportsByDate = async (datum) => {
+  console.log('storage.js: filtriram po datumu:', datum);
+  const reports = await getReportsFromFirebase();
+  return reports.filter(report => report.datum === datum);
 };
 
-export const getReportsBySmena = (smena) => {
-  return getReports().filter(report => report.smena === smena);
+export const getReportsBySmena = async (smena) => {
+  console.log('storage.js: filtriram po smeni:', smena);
+  const reports = await getReportsFromFirebase();
+  return reports.filter(report => report.smena === smena);
 };
