@@ -9,6 +9,7 @@ export default function Istorija() {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSmena, setSelectedSmena] = useState('');
   const [showDetails, setShowDetails] = useState({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadReports();
@@ -18,23 +19,43 @@ export default function Istorija() {
     filterReports();
   }, [reports, selectedDate, selectedSmena]);
 
-  const loadReports = () => {
-    const allReports = getReports();
-    setReports(allReports);
+  const loadReports = async () => {
+    try {
+      setLoading(true);
+      const allReports = await getReports(); // Sada je async
+      setReports(allReports);
+      console.log('Učitano', allReports.length, 'izveštaja iz Firebase');
+    } catch (error) {
+      console.error('Greška pri učitavanju izveštaja:', error);
+      alert('Greška pri učitavanju izveštaja iz baze');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const filterReports = () => {
-    let filtered = [...reports];
-    
-    if (selectedDate) {
-      filtered = filtered.filter(report => report.datum === selectedDate);
+  const filterReports = async () => {
+    try {
+      let filtered = [...reports];
+      
+      // Ako su odabrani specifični filteri, koristi Firebase query-je
+      if (selectedDate && selectedSmena) {
+        // Kombinacija oba filtera - filtriraj localno
+        filtered = reports.filter(report => 
+          report.datum === selectedDate && report.smena === selectedSmena
+        );
+      } else if (selectedDate) {
+        // Samo datum - koristi Firebase query
+        filtered = await getReportsByDate(selectedDate);
+      } else if (selectedSmena) {
+        // Samo smena - koristi Firebase query  
+        filtered = await getReportsBySmena(selectedSmena);
+      }
+      
+      setFilteredReports(filtered);
+    } catch (error) {
+      console.error('Greška pri filtriranju:', error);
+      setFilteredReports([]);
     }
-    
-    if (selectedSmena) {
-      filtered = filtered.filter(report => report.smena === selectedSmena);
-    }
-    
-    setFilteredReports(filtered);
   };
 
   const toggleDetails = (reportId) => {
@@ -60,27 +81,54 @@ export default function Istorija() {
 
   const calculateTotals = (reportsList) => {
     return reportsList.reduce((totals, report) => ({
-      gotovina: totals.gotovina + report.ukupnaGotovina,
-      kartice: totals.kartice + report.kartice,
-      virman: totals.virman + report.virman,
-      vipPopust: totals.vipPopust + report.vipPopust
+      gotovina: totals.gotovina + (report.ukupnaGotovina || 0),
+      kartice: totals.kartice + (report.kartice || 0),
+      virman: totals.virman + (report.virman || 0),
+      vipPopust: totals.vipPopust + (report.vipPopust || 0)
     }), { gotovina: 0, kartice: 0, virman: 0, vipPopust: 0 });
+  };
+
+  const getTotalForDate = (datum) => {
+    const calcsForDate = reports.filter(report => report.datum === datum);
+    return calcsForDate.reduce((sum, calc) => sum + (calc.ukupnaGotovina || 0), 0);
   };
 
   const totals = calculateTotals(filteredReports);
 
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4 max-w-4xl">
+        <div className="text-center py-8">
+          <div className="text-2xl">⏳</div>
+          <p className="text-gray-500 mt-2">Učitavam izveštaje iz Firebase baze...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">📊 Istorija izveštaja</h1>
-        <Link href="/" className="bg-blue-500 text-white px-4 py-2 rounded-lg">
-          Novi izveštaj
-        </Link>
+        <div>
+          <h1 className="text-2xl font-bold">📊 Istorija izveštaja</h1>
+          <p className="text-sm text-gray-500">Real-time sinhronizacija sa Firebase</p>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={loadReports}
+            className="bg-gray-500 text-white px-3 py-2 rounded-lg text-sm"
+          >
+            🔄 Osvezi
+          </button>
+          <Link href="/" className="bg-blue-500 text-white px-4 py-2 rounded-lg">
+            Novi izveštaj
+          </Link>
+        </div>
       </div>
 
       {reports.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-gray-500 mb-4">Nemate sačuvane izveštaje</p>
+          <p className="text-gray-500 mb-4">Nemate sačuvane izveštaje u Firebase bazi</p>
           <Link href="/" className="bg-blue-500 text-white px-6 py-3 rounded-lg">
             Kreiraj prvi izveštaj
           </Link>
@@ -99,7 +147,7 @@ export default function Istorija() {
                 <option value="">Svi datumi</option>
                 {getUniqueValues('datum').map(datum => (
                   <option key={datum} value={datum}>
-                    {formatDate(datum)}
+                    {formatDate(datum)} - {formatCurrency(getTotalForDate(datum))}
                   </option>
                 ))}
               </select>
@@ -195,7 +243,7 @@ export default function Istorija() {
                       </div>
                       <div className="text-right">
                         <div className="text-2xl font-bold text-green-600">
-                          {formatCurrency(report.ukupnaGotovina)}
+                          {formatCurrency(report.ukupnaGotovina || 0)}
                         </div>
                         <div className="text-sm text-gray-500">
                           {showDetails[report.id] ? '▼' : '▶'} Detaljno
@@ -211,7 +259,7 @@ export default function Istorija() {
                         <div>
                           <h4 className="font-medium mb-2">💰 Gotovinski promet:</h4>
                           <div className="text-sm space-y-1">
-                            {Object.entries(report.apoeni).map(([apoen, broj]) => 
+                            {report.apoeni && Object.entries(report.apoeni).map(([apoen, broj]) => 
                               broj > 0 && (
                                 <div key={apoen} className="flex justify-between">
                                   <span>{apoen} RSD × {broj}:</span>
@@ -233,15 +281,15 @@ export default function Istorija() {
                           <div className="text-sm space-y-1">
                             <div className="flex justify-between">
                               <span>Kartice:</span>
-                              <span>{formatCurrency(report.kartice)}</span>
+                              <span>{formatCurrency(report.kartice || 0)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Virman:</span>
-                              <span>{formatCurrency(report.virman)}</span>
+                              <span>{formatCurrency(report.virman || 0)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>VIP popust:</span>
-                              <span className="text-red-600">{formatCurrency(report.vipPopust)}</span>
+                              <span className="text-red-600">{formatCurrency(report.vipPopust || 0)}</span>
                             </div>
                           </div>
                         </div>

@@ -36,7 +36,7 @@ export default function RestoranForma() {
     }));
   };
 
-  const handleSacuvaj = () => {
+  const handleSacuvaj = async () => {
     if (!datum || !smena || !izvestajSastavio) {
       alert('Molimo unesite datum, smenu i ko je sastavio izveštaj!');
       return;
@@ -55,23 +55,30 @@ export default function RestoranForma() {
       izvestajSastavio
     };
 
-    saveReport(reportData);
-    setSacuvano(true);
-    
-    // Reset forme nakon 2 sekunde
-    setTimeout(() => {
+    try {
+      setSacuvano('saving'); // Loading state
+      await saveReport(reportData);
+      setSacuvano(true);
+      alert('Izveštaj je uspešno sačuvan u Firebase bazu!');
+      
+      // Reset forme nakon 2 sekunde
+      setTimeout(() => {
+        setSacuvano(false);
+        setSmena('');
+        setApoeni({
+          5000: '', 2000: '', 1000: '', 500: '', 200: '', 100: '', 50: '', 20: '', 10: ''
+        });
+        setEuri('');
+        setKartice('');
+        setVirman('');
+        setVipPopust('');
+        setNapomena('');
+      }, 2000);
+    } catch (error) {
       setSacuvano(false);
-      // Reset svih polja osim datuma i ko je sastavio
-      setSmena('');
-      setApoeni({
-        5000: '', 2000: '', 1000: '', 500: '', 200: '', 100: '', 50: '', 20: '', 10: ''
-      });
-      setEuri('');
-      setKartice('');
-      setVirman('');
-      setVipPopust('');
-      setNapomena('');
-    }, 2000);
+      console.error('Greška pri čuvanju:', error);
+      alert('Greška pri čuvanju u bazu. Pokušajte ponovo.');
+    }
   };
 
   return (
@@ -235,22 +242,24 @@ export default function RestoranForma() {
         </div>
       </div>
 
-      {/* Save dugme */}
+      {/* Save dugme sa loading states */}
       <button 
         onClick={handleSacuvaj}
         className={`w-full p-4 rounded-lg text-lg font-bold ${
-          sacuvano 
+          sacuvano === 'saving'
+            ? 'bg-yellow-500 text-white cursor-wait'
+            : sacuvano === true
             ? 'bg-green-500 text-white' 
             : 'bg-blue-500 text-white hover:bg-blue-600'
         }`}
-        disabled={sacuvano}
+        disabled={sacuvano === 'saving' || sacuvano === true}
       >
-        {sacuvano ? '✅ Sačuvano!' : '💾 Sačuvaj izveštaj'}
+        {sacuvano === 'saving' ? '⏳ Čuvam u bazu...' : sacuvano === true ? '✅ Sačuvano u Firebase!' : '💾 Sačuvaj u bazu'}
       </button>
 
-      {sacuvano && (
+      {sacuvano === true && (
         <p className="text-center text-green-600 mt-2 font-medium">
-          Izveštaj je uspešno sačuvan!
+          Izveštaj je uspešno sačuvan u Firebase bazu i dostupan svima!
         </p>
       )}
     </div>
