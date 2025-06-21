@@ -1,24 +1,30 @@
 import { useState, useEffect } from 'react';
-import { getReportsFromFirebase, deleteReportFromFirebase } from '../utils/firebase';
+import { getReports } from '../utils/storage';
 import { formatCurrency } from '../utils/calculations';
-import { onSnapshot, collection, query, orderBy } from 'firebase/firestore';
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
 import Link from 'next/link';
 
-// Firebase config (kopirajte iz vašeg firebase.js)
-const firebaseConfig = {
-  apiKey: "AIzaSyAfZEjfCX1Lu3LIR0yEZXd6YyzzdVBoRNs",
-  authDomain: "restoran-aplikacija-ef31f.firebaseapp.com",
-  projectId: "restoran-aplikacija-ef31f",
-  storageBucket: "restoran-aplikacija-ef31f.firebasestorage.app",
-  messagingSenderId: "663723248829",
-  appId: "1:663723248829:web:45f32ebffd11c9960efbd4",
-  measurementId: "G-X86WXDZCKH"
-};
+// Funkcija za brisanje putem API poziva
+const deleteReportFromAPI = async (reportId) => {
+  try {
+    console.log('Brišem izveštaj iz MySQL:', reportId);
+    
+    const response = await fetch(`/api/reports/delete?id=${reportId}`, {
+      method: 'DELETE',
+    });
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Nepoznata greška pri brisanju');
+    }
+
+    const result = await response.json();
+    console.log('✅ Izveštaj obrisan iz MySQL:', result);
+    return result;
+  } catch (error) {
+    console.error('❌ Greška pri brisanju iz MySQL:', error);
+    throw error;
+  }
+};
 
 export default function Istorija() {
   const [reports, setReports] = useState([]);
@@ -27,52 +33,26 @@ export default function Istorija() {
   const [selectedSmena, setSelectedSmena] = useState('');
   const [showDetails, setShowDetails] = useState({});
   const [loading, setLoading] = useState(true);
-  const [realTimeUpdate, setRealTimeUpdate] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
 
   useEffect(() => {
-    // Real-time listener za sve promene u Firebase
-    const q = query(collection(db, 'reports'), orderBy('timestamp', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const newReports = [];
-      querySnapshot.forEach((doc) => {
-        newReports.push({ id: doc.id, ...doc.data() });
-      });
-      
-      console.log('Real-time update: učitano', newReports.length, 'izveštaja');
-      
-      if (reports.length > 0 && newReports.length !== reports.length) {
-        setRealTimeUpdate(true);
-        setTimeout(() => setRealTimeUpdate(false), 3000);
-      }
-      
-      setReports(newReports);
-      setLastUpdate(new Date());
-      setLoading(false);
-    }, (error) => {
-      console.error('Greška u real-time listener:', error);
-      setLoading(false);
-    });
-
-    // Cleanup kada se komponenta unmount-uje
-    return () => unsubscribe();
+    loadReports();
   }, []);
 
   useEffect(() => {
     filterReports();
   }, [reports, selectedDate, selectedSmena]);
 
-  const loadReportsManually = async () => {
+  const loadReports = async () => {
     try {
       setLoading(true);
-      const freshReports = await getReportsFromFirebase();
+      const freshReports = await getReports();
       setReports(freshReports);
       setLastUpdate(new Date());
-      console.log('Ručno osveženo:', freshReports.length, 'izveštaja');
+      console.log('Učitano:', freshReports.length, 'izveštaja iz MySQL');
     } catch (error) {
-      console.error('Greška pri ručnom osvežavanju:', error);
-      alert('Greška pri osvežavanju podataka');
+      console.error('Greška pri učitavanju iz MySQL:', error);
+      alert('Greška pri učitavanju podataka iz MySQL baze: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -83,13 +63,13 @@ export default function Istorija() {
     
     if (confirm(confirmMessage)) {
       try {
-        await deleteReportFromFirebase(reportId);
-        alert('Izveštaj je uspešno obrisan!');
+        await deleteReportFromAPI(reportId);
+        alert('Izveštaj je uspešno obrisan iz MySQL baze!');
         
         // Ukloni iz lokalnog state-a odmah
         setReports(prev => prev.filter(report => report.id !== reportId));
       } catch (error) {
-        console.error('Greška pri brisanju:', error);
+        console.error('Greška pri brisanju iz MySQL:', error);
         alert('Greška pri brisanju izveštaja: ' + error.message);
       }
     }
@@ -151,7 +131,7 @@ export default function Istorija() {
       <div className="container mx-auto p-4 max-w-4xl">
         <div className="text-center py-8">
           <div className="text-2xl">⏳</div>
-          <p className="text-gray-500 mt-2">Učitavam izveštaje iz Firebase baze...</p>
+          <p className="text-gray-500 mt-2">Učitavam izveštaje iz MySQL baze...</p>
         </div>
       </div>
     );
@@ -163,12 +143,7 @@ export default function Istorija() {
         <div>
           <h1 className="text-2xl font-bold">📊 Istorija izveštaja</h1>
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>Real-time Firebase sinhronizacija</span>
-            {realTimeUpdate && (
-              <span className="bg-green-100 text-green-600 px-2 py-1 rounded-full text-xs">
-                🔄 Novo ažuriranje!
-              </span>
-            )}
+            <span>💾 MySQL baza podataka (aggroup.rs)</span>
           </div>
           {lastUpdate && (
             <p className="text-xs text-gray-400">
@@ -178,7 +153,7 @@ export default function Istorija() {
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={loadReportsManually}
+            onClick={loadReports}
             className={`px-3 py-2 rounded-lg text-sm ${
               loading 
                 ? 'bg-gray-400 text-white cursor-wait' 
@@ -197,14 +172,14 @@ export default function Istorija() {
       {/* Statistike */}
       <div className="bg-blue-50 p-4 rounded-lg mb-4">
         <div className="flex justify-between text-sm">
-          <span>Ukupno izveštaja u bazi: <strong>{reports.length}</strong></span>
+          <span>Ukupno izveštaja u MySQL bazi: <strong>{reports.length}</strong></span>
           <span>Prikazano: <strong>{filteredReports.length}</strong></span>
         </div>
       </div>
 
       {reports.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-gray-500 mb-4">Nemate sačuvane izveštaje u Firebase bazi</p>
+          <p className="text-gray-500 mb-4">Nemate sačuvane izveštaje u MySQL bazi</p>
           <Link href="/" className="bg-blue-500 text-white px-6 py-3 rounded-lg">
             Kreiraj prvi izveštaj
           </Link>

@@ -59,7 +59,7 @@ export default function RestoranForma() {
       setSacuvano('saving'); // Loading state
       await saveReport(reportData);
       setSacuvano(true);
-      alert('Izveštaj je uspešno sačuvan u Firebase bazu!');
+      alert('Izveštaj je uspešno sačuvan u MySQL bazu!');
       
       // Reset forme nakon 2 sekunde
       setTimeout(() => {
@@ -76,15 +76,18 @@ export default function RestoranForma() {
       }, 2000);
     } catch (error) {
       setSacuvano(false);
-      console.error('Greška pri čuvanju:', error);
-      alert('Greška pri čuvanju u bazu. Pokušajte ponovo.');
+      console.error('Greška pri čuvanju u MySQL:', error);
+      alert('Greška pri čuvanju u MySQL bazu. Pokušajte ponovo.');
     }
   };
 
   return (
     <div className="container mx-auto p-4 max-w-md">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Dnevni izveštaj</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Dnevni izveštaj</h1>
+          <p className="text-xs text-gray-500">💾 MySQL baza (aggroup.rs)</p>
+        </div>
         <Link href="/istorija" className="text-blue-500 text-sm">
           Istorija
         </Link>
@@ -254,12 +257,12 @@ export default function RestoranForma() {
         }`}
         disabled={sacuvano === 'saving' || sacuvano === true}
       >
-        {sacuvano === 'saving' ? '⏳ Čuvam u bazu...' : sacuvano === true ? '✅ Sačuvano u Firebase!' : '💾 Sačuvaj u bazu'}
+        {sacuvano === 'saving' ? '⏳ Čuvam u MySQL...' : sacuvano === true ? '✅ Sačuvano u MySQL!' : '💾 Sačuvaj u MySQL bazu'}
       </button>
 
       {sacuvano === true && (
         <p className="text-center text-green-600 mt-2 font-medium">
-          Izveštaj je uspešno sačuvan u Firebase bazu i dostupan svima!
+          Izveštaj je uspešno sačuvan u MySQL bazu na aggroup.rs serveru!
         </p>
       )}
     </div>
