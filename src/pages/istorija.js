@@ -33,6 +33,7 @@ export default function Istorija() {
   const [selectedSmena, setSelectedSmena] = useState('');
   const [showDetails, setShowDetails] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
 
   useEffect(() => {
@@ -46,13 +47,14 @@ export default function Istorija() {
   const loadReports = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const freshReports = await getReports();
       setReports(freshReports);
       setLastUpdate(new Date());
       console.log('Učitano:', freshReports.length, 'izveštaja iz MySQL');
     } catch (error) {
       console.error('Greška pri učitavanju iz MySQL:', error);
-      alert('Greška pri učitavanju podataka iz MySQL baze: ' + error.message);
+      setLoadError(error.message);
     } finally {
       setLoading(false);
     }
@@ -137,6 +139,23 @@ export default function Istorija() {
     );
   }
 
+  if (loadError && reports.length === 0) {
+    return (
+      <div className="container mx-auto p-4 max-w-4xl">
+        <div className="bg-red-50 border border-red-300 rounded-lg p-6 mt-8">
+          <h2 className="text-lg font-bold text-red-700 mb-2">Greška pri učitavanju podataka</h2>
+          <p className="text-red-600 text-sm font-mono break-all">{loadError}</p>
+          <button
+            onClick={loadReports}
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            Pokušaj ponovo
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <div className="flex justify-between items-center mb-6">
@@ -168,6 +187,14 @@ export default function Istorija() {
           </Link>
         </div>
       </div>
+
+      {/* Greška pri osvežavanju */}
+      {loadError && (
+        <div className="bg-red-50 border border-red-300 rounded-lg p-4 mb-4">
+          <p className="text-red-700 font-medium">Greška pri učitavanju podataka:</p>
+          <p className="text-red-600 text-sm font-mono break-all mt-1">{loadError}</p>
+        </div>
+      )}
 
       {/* Statistike */}
       <div className="bg-blue-50 p-4 rounded-lg mb-4">

@@ -11,7 +11,9 @@ export const saveReport = async (reportData) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Greška pri čuvanju');
+      const details = errorData.details ? ` (${errorData.details})` : '';
+      const code = errorData.code ? ` [${errorData.code}]` : '';
+      throw new Error((errorData.error || 'Greška pri čuvanju') + details + code);
     }
 
     const result = await response.json();
@@ -25,13 +27,15 @@ export const saveReport = async (reportData) => {
 
 export const getReports = async () => {
   console.log('storage.js: šalje na /api/reports/list');
-  
+
   try {
     const response = await fetch('/api/reports/list');
-    
+
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Greška pri učitavanju');
+      const details = errorData.details ? ` (${errorData.details})` : '';
+      const code = errorData.code ? ` [${errorData.code}]` : '';
+      throw new Error((errorData.error || 'Greška pri učitavanju') + details + code);
     }
 
     const reports = await response.json();
@@ -46,10 +50,12 @@ export const getReports = async () => {
 export const getReportsByDate = async (datum) => {
   try {
     const response = await fetch(`/api/reports/list?datum=${datum}`);
-    
+
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Greška pri učitavanju');
+      const details = errorData.details ? ` (${errorData.details})` : '';
+      const code = errorData.code ? ` [${errorData.code}]` : '';
+      throw new Error((errorData.error || 'Greška pri učitavanju') + details + code);
     }
 
     return await response.json();
@@ -62,10 +68,12 @@ export const getReportsByDate = async (datum) => {
 export const getReportsBySmena = async (smena) => {
   try {
     const response = await fetch(`/api/reports/list?smena=${encodeURIComponent(smena)}`);
-    
+
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Greška pri učitavanju');
+      const details = errorData.details ? ` (${errorData.details})` : '';
+      const code = errorData.code ? ` [${errorData.code}]` : '';
+      throw new Error((errorData.error || 'Greška pri učitavanju') + details + code);
     }
 
     return await response.json();
