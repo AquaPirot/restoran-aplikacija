@@ -17,7 +17,10 @@ export default function Istorija() {
   }, []);
 
   useEffect(() => {
-    filterReports();
+    let filtered = [...reports];
+    if (selectedDate) filtered = filtered.filter(r => r.datum === selectedDate);
+    if (selectedSmena) filtered = filtered.filter(r => r.smena === selectedSmena);
+    setFilteredReports(filtered);
   }, [reports, selectedDate, selectedSmena]);
 
   const loadReports = async () => {
@@ -34,13 +37,6 @@ export default function Istorija() {
       await deleteReport(reportId);
       setReports(prev => prev.filter(r => r.id !== reportId));
     }
-  };
-
-  const filterReports = () => {
-    let filtered = [...reports];
-    if (selectedDate) filtered = filtered.filter(r => r.datum === selectedDate);
-    if (selectedSmena) filtered = filtered.filter(r => r.smena === selectedSmena);
-    setFilteredReports(filtered);
   };
 
   const toggleDetails = (reportId) => {
