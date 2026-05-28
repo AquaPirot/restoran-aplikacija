@@ -1,76 +1,78 @@
-// Next.js API routes pristup - sada imamo sve endpoints
-export const saveReport = async (reportData) => {
-  console.log('storage.js: šalje na /api/reports/save');
-  
+const STORAGE_KEY = 'restoran_reports';
+const AUTHOR_KEY = 'restoran_last_author';
+const EXPIRY_DAYS = 7;
+
+const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+const readAll = () => {
   try {
-    const response = await fetch('/api/reports/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reportData),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Greška pri čuvanju');
-    }
-
-    const result = await response.json();
-    console.log('✅ Sačuvano u MySQL:', result);
-    return result;
-  } catch (error) {
-    console.error('❌ API greška:', error);
-    throw error;
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
   }
+};
+
+const writeAll = (reports) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+};
+
+const isExpired = (report) => {
+  const savedAt = new Date(report.savedAt || report.timestamp);
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - EXPIRY_DAYS);
+  return savedAt < cutoff;
+};
+
+const purgeExpired = (reports) => {
+  const valid = reports.filter(r => !isExpired(r));
+  if (valid.length !== reports.length) writeAll(valid);
+  return valid;
+};
+
+export const saveReport = async (reportData) => {
+  const reports = readAll();
+  const report = {
+    ...reportData,
+    id: generateId(),
+    savedAt: new Date().toISOString(),
+    timestamp: new Date().toISOString(),
+  };
+  reports.unshift(report);
+  writeAll(reports);
+  return report;
 };
 
 export const getReports = async () => {
-  console.log('storage.js: šalje na /api/reports/list');
-  
-  try {
-    const response = await fetch('/api/reports/list');
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Greška pri učitavanju');
-    }
-
-    const reports = await response.json();
-    console.log('✅ Učitano iz MySQL:', reports.length, 'izveštaja');
-    return reports;
-  } catch (error) {
-    console.error('❌ API greška:', error);
-    throw error;
-  }
+  return purgeExpired(readAll());
 };
 
 export const getReportsByDate = async (datum) => {
-  try {
-    const response = await fetch(`/api/reports/list?datum=${datum}`);
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Greška pri učitavanju');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('❌ API greška:', error);
-    throw error;
-  }
+  const reports = await getReports();
+  return reports.filter(r => r.datum === datum);
 };
 
 export const getReportsBySmena = async (smena) => {
-  try {
-    const response = await fetch(`/api/reports/list?smena=${encodeURIComponent(smena)}`);
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Greška pri učitavanju');
-    }
+  const reports = await getReports();
+  return reports.filter(r => r.smena === smena);
+};
 
-    return await response.json();
-  } catch (error) {
-    console.error('❌ API greška:', error);
-    throw error;
-  }
+export const deleteReport = async (id) => {
+  writeAll(readAll().filter(r => r.id !== id));
+};
+
+export const getDaysUntilExpiry = (report) => {
+  const savedAt = new Date(report.savedAt || report.timestamp);
+  const expiresAt = new Date(savedAt);
+  expiresAt.setDate(expiresAt.getDate() + EXPIRY_DAYS);
+  const msLeft = expiresAt - new Date();
+  return Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+};
+
+export const getLastAuthor = () => {
+  try { return localStorage.getItem(AUTHOR_KEY) || ''; } catch { return ''; }
+};
+
+export const saveLastAuthor = (name) => {
+  try { localStorage.setItem(AUTHOR_KEY, name); } catch {}
 };

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { calculateGotovina, formatCurrency } from '../utils/calculations';
-import { saveReport } from '../utils/storage';
+import { saveReport, getLastAuthor, saveLastAuthor } from '../utils/storage';
 import Link from 'next/link';
 
 export default function RestoranForma() {
@@ -26,14 +26,15 @@ export default function RestoranForma() {
   const [sacuvano, setSacuvano] = useState(false);
 
   const apoenVrednosti = [5000, 2000, 1000, 500, 200, 100, 50, 20, 10];
-  
+
+  useEffect(() => {
+    setIzvestajSastavio(getLastAuthor());
+  }, []);
+
   const { ukupnoApoeni, euriUDinarima, ukupnaGotovina } = calculateGotovina(apoeni, Number(euri) || 0);
 
   const handleApoenChange = (vrednost, broj) => {
-    setApoeni(prev => ({
-      ...prev,
-      [vrednost]: broj
-    }));
+    setApoeni(prev => ({ ...prev, [vrednost]: broj }));
   };
 
   const handleSacuvaj = async () => {
@@ -56,18 +57,15 @@ export default function RestoranForma() {
     };
 
     try {
-      setSacuvano('saving'); // Loading state
+      setSacuvano('saving');
       await saveReport(reportData);
+      saveLastAuthor(izvestajSastavio);
       setSacuvano(true);
-      alert('Izveštaj je uspešno sačuvan u MySQL bazu!');
-      
-      // Reset forme nakon 2 sekunde
+
       setTimeout(() => {
         setSacuvano(false);
         setSmena('');
-        setApoeni({
-          5000: '', 2000: '', 1000: '', 500: '', 200: '', 100: '', 50: '', 20: '', 10: ''
-        });
+        setApoeni({ 5000: '', 2000: '', 1000: '', 500: '', 200: '', 100: '', 50: '', 20: '', 10: '' });
         setEuri('');
         setKartice('');
         setVirman('');
@@ -76,8 +74,8 @@ export default function RestoranForma() {
       }, 2000);
     } catch (error) {
       setSacuvano(false);
-      console.error('Greška pri čuvanju u MySQL:', error);
-      alert('Greška pri čuvanju u MySQL bazu. Pokušajte ponovo.');
+      console.error('Greška pri čuvanju:', error);
+      alert('Greška pri čuvanju izveštaja. Pokušajte ponovo.');
     }
   };
 
@@ -86,7 +84,7 @@ export default function RestoranForma() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">Dnevni izveštaj</h1>
-          <p className="text-xs text-gray-500">💾 MySQL baza (aggroup.rs)</p>
+          <p className="text-xs text-gray-500">📱 Lokalno čuvanje · 7 dana</p>
         </div>
         <Link href="/istorija" className="text-blue-500 text-sm">
           Istorija
@@ -97,17 +95,17 @@ export default function RestoranForma() {
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
           <label className="block mb-2 font-medium">Datum:</label>
-          <input 
-            type="date" 
-            value={datum} 
+          <input
+            type="date"
+            value={datum}
             onChange={(e) => setDatum(e.target.value)}
             className="w-full p-3 border rounded-lg"
           />
         </div>
         <div>
           <label className="block mb-2 font-medium">Smena:</label>
-          <select 
-            value={smena} 
+          <select
+            value={smena}
             onChange={(e) => setSmena(e.target.value)}
             className="w-full p-3 border rounded-lg"
           >
@@ -122,7 +120,7 @@ export default function RestoranForma() {
       {/* Gotovinski promet */}
       <div className="mb-6">
         <h2 className="text-lg font-bold mb-3">💰 Gotovinski promet</h2>
-        
+
         {/* Apoeni */}
         <div className="bg-gray-50 p-4 rounded-lg mb-4">
           <h3 className="font-medium mb-3">Apoeni:</h3>
@@ -131,9 +129,9 @@ export default function RestoranForma() {
               <div key={vrednost} className="flex items-center justify-between">
                 <span className="w-16">{vrednost} RSD:</span>
                 <div className="flex items-center gap-2">
-                  <input 
-                    type="number" 
-                    value={apoeni[vrednost]} 
+                  <input
+                    type="number"
+                    value={apoeni[vrednost]}
                     onChange={(e) => handleApoenChange(vrednost, e.target.value)}
                     className="w-20 p-2 border rounded text-center"
                     placeholder="0"
@@ -158,9 +156,9 @@ export default function RestoranForma() {
           <div className="flex items-center justify-between">
             <label className="font-medium">Euri u pazaru:</label>
             <div className="flex items-center gap-2">
-              <input 
-                type="number" 
-                value={euri} 
+              <input
+                type="number"
+                value={euri}
                 onChange={(e) => setEuri(e.target.value)}
                 className="w-20 p-2 border rounded text-center"
                 placeholder="0"
@@ -188,9 +186,9 @@ export default function RestoranForma() {
       <div className="space-y-4 mb-6">
         <div>
           <label className="block mb-2 font-medium">💳 Ukupan iznos kartica:</label>
-          <input 
-            type="number" 
-            value={kartice} 
+          <input
+            type="number"
+            value={kartice}
             onChange={(e) => setKartice(e.target.value)}
             className="w-full p-3 border rounded-lg text-lg"
             placeholder="0"
@@ -199,9 +197,9 @@ export default function RestoranForma() {
 
         <div>
           <label className="block mb-2 font-medium">🏦 Ukupan iznos virmana:</label>
-          <input 
-            type="number" 
-            value={virman} 
+          <input
+            type="number"
+            value={virman}
             onChange={(e) => setVirman(e.target.value)}
             className="w-full p-3 border rounded-lg text-lg"
             placeholder="0"
@@ -210,9 +208,9 @@ export default function RestoranForma() {
 
         <div>
           <label className="block mb-2 font-medium">🎫 Ukupan iznos VIP popusta:</label>
-          <input 
-            type="number" 
-            value={vipPopust} 
+          <input
+            type="number"
+            value={vipPopust}
             onChange={(e) => setVipPopust(e.target.value)}
             className="w-full p-3 border rounded-lg text-lg"
             placeholder="0"
@@ -224,8 +222,8 @@ export default function RestoranForma() {
       <div className="space-y-4 mb-6">
         <div>
           <label className="block mb-2 font-medium">📝 Napomena:</label>
-          <textarea 
-            value={napomena} 
+          <textarea
+            value={napomena}
             onChange={(e) => setNapomena(e.target.value)}
             className="w-full p-3 border rounded-lg"
             rows="3"
@@ -235,9 +233,9 @@ export default function RestoranForma() {
 
         <div>
           <label className="block mb-2 font-medium">👤 Izveštaj sastavio:</label>
-          <input 
-            type="text" 
-            value={izvestajSastavio} 
+          <input
+            type="text"
+            value={izvestajSastavio}
             onChange={(e) => setIzvestajSastavio(e.target.value)}
             className="w-full p-3 border rounded-lg text-lg"
             placeholder="Ime konobara"
@@ -245,24 +243,24 @@ export default function RestoranForma() {
         </div>
       </div>
 
-      {/* Save dugme sa loading states */}
-      <button 
+      {/* Save dugme */}
+      <button
         onClick={handleSacuvaj}
         className={`w-full p-4 rounded-lg text-lg font-bold ${
           sacuvano === 'saving'
             ? 'bg-yellow-500 text-white cursor-wait'
             : sacuvano === true
-            ? 'bg-green-500 text-white' 
+            ? 'bg-green-500 text-white'
             : 'bg-blue-500 text-white hover:bg-blue-600'
         }`}
         disabled={sacuvano === 'saving' || sacuvano === true}
       >
-        {sacuvano === 'saving' ? '⏳ Čuvam u MySQL...' : sacuvano === true ? '✅ Sačuvano u MySQL!' : '💾 Sačuvaj u MySQL bazu'}
+        {sacuvano === 'saving' ? '⏳ Čuvam...' : sacuvano === true ? '✅ Sačuvano!' : '💾 Sačuvaj izveštaj'}
       </button>
 
       {sacuvano === true && (
         <p className="text-center text-green-600 mt-2 font-medium">
-          Izveštaj je uspešno sačuvan u MySQL bazu na aggroup.rs serveru!
+          Izveštaj je sačuvan lokalno. Čuva se 7 dana.
         </p>
       )}
     </div>
